@@ -1,0 +1,13 @@
+{
+  "recruiter1.fullName": "Recruiter1",
+  "recruiter1.phone":    "9000000002",
+  "recruiter1.role":     "RECRUITER",
+
+  "job1.title":       "Backend Developer",
+  "job1.description": "Java Spring Boot developer role",
+  "job1.location":    "Pune, India",
+  "job1.company":     "HireFlow Technologies",
+  "job1.salary":      "10,00,000 - 18,00,000",
+  "job1.type":        "FULL_TIME"
+}
+

@@ -6,18 +6,25 @@ package com.hiring.response;
 public class ApplicationResponse {
 
     private int id;
-    private int jobId;
+    private String appliedAt;
     private String coverLetter;
     private String status;
-    private String applicantEmail;
+    private UserResponse candidate;
+    private JobResponse job;
+    private JobResponse appliedJob;
 
     public ApplicationResponse() {}
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
-    public int getJobId() { return jobId; }
-    public void setJobId(int jobId) { this.jobId = jobId; }
+    public String getAppliedAt() {
+        return appliedAt;
+    }
+
+    public void setAppliedAt(String appliedAt) {
+        this.appliedAt = appliedAt;
+    }
 
     public String getCoverLetter() { return coverLetter; }
     public void setCoverLetter(String coverLetter) { this.coverLetter = coverLetter; }
@@ -25,7 +32,29 @@ public class ApplicationResponse {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    public String getApplicantEmail() { return applicantEmail; }
-    public void setApplicantEmail(String applicantEmail) { this.applicantEmail = applicantEmail; }
+
+    public UserResponse getCandidate() {
+        return candidate;
+    }
+
+    public void setCandidate(UserResponse candidate) {
+        this.candidate = candidate;
+    }
+
+    public JobResponse getJob() {
+        return job;
+    }
+
+    public void setJob(JobResponse job) {
+        this.job = job;
+    }
+
+    public JobResponse getAppliedJob() {
+        return appliedJob;
+    }
+
+    public void setAppliedJob(JobResponse appliedJob) {
+        this.appliedJob = appliedJob;
+    }
 }
 

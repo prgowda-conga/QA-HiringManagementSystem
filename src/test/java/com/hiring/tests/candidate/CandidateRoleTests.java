@@ -2,7 +2,6 @@ package com.hiring.tests.candidate;
 
 import com.hiring.commonMethods.CommonMethod;
 import com.hiring.helpers.ActorHelper;
-import com.hiring.response.ApplicationResponse;
 import com.hiring.utils.BaseTest;
 import com.hiring.utils.RestUtils;
 import com.hiring.utils.UserTokenManager;
@@ -15,39 +14,36 @@ import org.testng.annotations.Test;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * CandidateRoleTests — Validates candidate-role API interactions.
+ * CandidateRoleTests — Three focused tests for Candidate role
  *
  * Actors:
- *   recruiter1 → Recruiter1  (creates jobs as pre-condition)
- *   candidate1 → Candidate1  (primary actor for all 3 test cases)
+ *  recruiter1 → Recruiter1  (userDetails prefix: recruiter1)
+ *  candidate1 → Candidate1  (userDetails prefix: candidate1)
  *
- * Test Cases:
- *   TC_CR_001 – getAllJobListings      — Candidate views all active job listings
- *   TC_CR_002 – applyForJob           — Candidate applies for a job
- *   TC_CR_003 – trackApplicationStatus — Candidate tracks their application status
+ * Test cases:
+ *  TC_CR_001 – Candidate Views All Job Listings
+ *  TC_CR_002 – Candidate Applies for a Job
+ *  TC_CR_003 – Candidate Tracks Application Status
  */
 public class CandidateRoleTests extends BaseTest {
 
     private static final Logger log = LogManager.getLogger(CandidateRoleTests.class);
 
-    // ── Single source of truth for all credentials ────────────────────────────
+    // ── UserTokenManager — single source of truth for all credentials ──────────
     private UserTokenManager tokenManager;
 
-    // ── Actors used by this test class ───────────────────────────────────────
-    public ActorHelper actorHelperForRecruiter1;   // Recruiter1 — creates jobs
-    public ActorHelper actorHelperForCandidate1;   // Candidate1 — primary actor
+    // ── Actors: only the roles this test class needs ──────────────────────────
+    public ActorHelper actorHelperForRecruiter1;
+    public ActorHelper actorHelperForCandidate1;
 
     public RestUtils restUtilsForRecruiter1;
     public RestUtils restUtilsForCandidate1;
 
-    // Access tokens — for reference / debugging only
-    public String accessTokenRecruiter1;
-    public String accessTokenCandidate1;
-
     // ═══════════════════════════════════════════════════════════════════════════
-    //  SETUP — runs once before all @Test methods in this class
+    //  SETUP — runs once before all @Test methods
     // ═══════════════════════════════════════════════════════════════════════════
 
     @BeforeClass
@@ -58,13 +54,10 @@ public class CandidateRoleTests extends BaseTest {
          */
         tokenManager = new UserTokenManager();
 
-        accessTokenRecruiter1 = tokenManager.getToken("recruiter1");
-        accessTokenCandidate1 = tokenManager.getToken("candidate1");
+        restUtilsForRecruiter1 = tokenManager.getRestUtils("recruiter1");
+        restUtilsForCandidate1 = tokenManager.getRestUtils("candidate1");
 
-        restUtilsForRecruiter1   = tokenManager.getRestUtils("recruiter1");
         actorHelperForRecruiter1 = tokenManager.getActorHelper("recruiter1");
-
-        restUtilsForCandidate1   = tokenManager.getRestUtils("candidate1");
         actorHelperForCandidate1 = tokenManager.getActorHelper("candidate1");
     }
 
@@ -74,73 +67,78 @@ public class CandidateRoleTests extends BaseTest {
 
     /**
      * TC_CR_001 — Candidate Views All Job Listings
-     * Verifies that Candidate1 can retrieve all active job listings and that
-     * each job contains the required fields: title, company, location, type, active.
-     *
-     * Steps:
-     *  Step 01 – Recruiter1 creates a job (ensures at least one active listing)
-     *  Step 02 – Candidate1 calls GET /api/jobs
-     *  Step 03 – Assert: HTTP 200, data not empty, first job has all required fields
+     * Verifies that a Candidate can retrieve all active job listings and that each
+     * job contains required fields: id, title, company, location, type, active=true.
      */
     @Test(groups = {"Smoke"}, description = "TC_CR_001 - Candidate Views All Job Listings")
-    public void getAllJobListings() throws Exception {
+    public void candidateViewsAllJobListings() throws Exception {
 
-        // ── Load per-test static data ─────────────────────────────────────────
         HashMap<String, String> testData = CommonMethod.readTestData(
-                "src/main/resources/testdata/getAllJobListings.json");
+                "src/main/resources/testdata/candidateViewsAllJobListings.json");
 
-        // ── STEP 01 — Recruiter1 creates a job ───────────────────────────────
-        log.info("[TC_CR_001] ━━━ STEP 01 ━━━ Recruiter1 creates a job listing");
+        // ── STEP 01 — Recruiter1 creates a job to seed at least one active listing ──
+        log.info("[E2E] ━━━ STEP 01 ━━━ Recruiter1 creates a job to ensure at least one active listing exists");
         HashMap<String, String> jobData = new HashMap<>();
-        jobData.put("title",       testData.get("job.title"));
-        jobData.put("description", testData.get("job.description"));
-        jobData.put("location",    testData.get("job.location"));
-        jobData.put("company",     testData.get("job.company"));
-        jobData.put("salary",      testData.get("job.salary"));
-        jobData.put("type",        testData.get("job.type"));
-        Response createJobResponse = actorHelperForRecruiter1.createJob(jobData);
-        Assert.assertEquals(createJobResponse.getStatusCode(), 200,
-                "Recruiter1 job creation should return HTTP 200");
-        String createdJobId = createJobResponse.jsonPath().getString("data.id");
-        Assert.assertNotNull(createdJobId, "Created job ID must not be null");
-        log.info("[TC_CR_001] Recruiter1 created job ID: {}", createdJobId);
+        jobData.put("title",       testData.get("job1.title"));
+        jobData.put("description", testData.get("job1.description"));
+        jobData.put("location",    testData.get("job1.location"));
+        jobData.put("company",     testData.get("job1.company"));
+        jobData.put("salary",      testData.get("job1.salary"));
+        jobData.put("type",        testData.get("job1.type"));
+        Response createJobResp = actorHelperForRecruiter1.createJob(jobData);
+        Assert.assertEquals(createJobResp.getStatusCode(), 200,
+                "Recruiter1 job creation failed — expected HTTP 200");
+        String seededJobId = createJobResp.jsonPath().getString("data.id");
+        Assert.assertNotNull(seededJobId, "Seeded job ID must not be null");
+        Assert.assertTrue(createJobResp.jsonPath().getBoolean("data.active"),
+                "Newly created job must be active");
+        log.info("[E2E] Seeded job ID={}", seededJobId);
 
-        // ── STEP 02 — Candidate1 retrieves all active job listings ────────────
-        log.info("[TC_CR_001] ━━━ STEP 02 ━━━ Candidate1 calls GET /api/jobs");
-        Response getAllJobsResponse = actorHelperForCandidate1.getAllJobs();
+        // ── STEP 02 — Candidate1 retrieves all active job listings ──────────
+        log.info("[E2E] ━━━ STEP 02 ━━━ Candidate1 retrieves all active job listings: GET /api/jobs");
+        Response allJobsResp = actorHelperForCandidate1.getAllJobs();
+        Assert.assertEquals(allJobsResp.getStatusCode(), 200,
+                "Get all jobs failed — expected HTTP 200");
 
-        // ── STEP 03 — Assertions ──────────────────────────────────────────────
-        log.info("[TC_CR_001] ━━━ STEP 03 ━━━ Validating job listing response");
+        // ── STEP 03 — Validate response structure and each job's required fields ──
+        log.info("[E2E] ━━━ STEP 03 ━━━ Validate response structure and job field completeness");
+        Assert.assertTrue(allJobsResp.jsonPath().getBoolean("success"),
+                "Response 'success' flag must be true");
 
-        // Assert HTTP 200
-        Assert.assertEquals(getAllJobsResponse.getStatusCode(), 200,
-                "GET /api/jobs should return HTTP 200");
+        List<Map<String, Object>> jobs = allJobsResp.jsonPath().getList("data");
+        Assert.assertNotNull(jobs, "Job data list must not be null");
+        Assert.assertTrue(jobs.size() >= 1,
+                "Job listing must contain at least one job (the seeded job must be visible)");
 
-        // Assert data array is present and non-empty
-        Assert.assertNotNull(getAllJobsResponse.jsonPath().get("data"),
-                "Response 'data' field must not be null");
-        List<?> jobs = getAllJobsResponse.jsonPath().getList("data");
-        Assert.assertFalse(jobs.isEmpty(),
-                "Job listing must contain at least one active job");
+        // Verify every job in the list has all required fields and is active;
+        // also confirm the seeded job appears with correct data
+        boolean seededJobFound = false;
+        for (Map<String, Object> job : jobs) {
+            Assert.assertNotNull(job.get("id"),       "Each job must have an 'id' field");
+            Assert.assertNotNull(job.get("title"),    "Each job must have a 'title' field");
+            Assert.assertNotNull(job.get("company"),  "Each job must have a 'company' field");
+            Assert.assertNotNull(job.get("location"), "Each job must have a 'location' field");
+            Assert.assertNotNull(job.get("type"),     "Each job must have a 'type' field");
+            Assert.assertTrue((Boolean) job.get("active"),
+                    "All listed jobs must have active=true (inactive jobs must not appear)");
 
-        // Assert the created job is present in the listing
-        boolean createdJobFound = getAllJobsResponse.jsonPath()
-                .getList("data.id").stream()
-                .anyMatch(id -> String.valueOf(id).equals(createdJobId));
-        Assert.assertTrue(createdJobFound,
-                "Created job (ID: " + createdJobId + ") must appear in the job listing");
+            if (seededJobId.equals(String.valueOf(job.get("id")))) {
+                Assert.assertEquals(job.get("title"),    testData.get("job1.title"),
+                        "Seeded job title must match");
+                Assert.assertEquals(job.get("company"),  testData.get("job1.company"),
+                        "Seeded job company must match");
+                Assert.assertEquals(job.get("location"), testData.get("job1.location"),
+                        "Seeded job location must match");
+                Assert.assertEquals(job.get("type"),     testData.get("job1.type"),
+                        "Seeded job type must match");
+                seededJobFound = true;
+            }
+        }
+        Assert.assertTrue(seededJobFound,
+                "The seeded job (ID=" + seededJobId + ") must be present in the active listings");
+        log.info("[E2E] Job listing validated — {} active jobs found, seeded job confirmed", jobs.size());
 
-        // Assert first job has all required fields
-        Assert.assertNotNull(getAllJobsResponse.jsonPath().getString("data[0].title"),
-                "Job title must not be null");
-        Assert.assertNotNull(getAllJobsResponse.jsonPath().getString("data[0].company"),
-                "Job company must not be null");
-        Assert.assertNotNull(getAllJobsResponse.jsonPath().getString("data[0].location"),
-                "Job location must not be null");
-        Assert.assertNotNull(getAllJobsResponse.jsonPath().getString("data[0].type"),
-                "Job type must not be null");
-
-        log.info("[TC_CR_001] ━━━ ALL STEPS COMPLETED SUCCESSFULLY ━━━ [{} job(s) found]", jobs.size());
+        log.info("[E2E] ━━━ ALL STEPS COMPLETED SUCCESSFULLY ━━━");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -149,80 +147,74 @@ public class CandidateRoleTests extends BaseTest {
 
     /**
      * TC_CR_002 — Candidate Applies for a Job
-     * Verifies that Candidate1 can apply for an active job and that the API
-     * responds with status PENDING, the correct cover letter, and the matching job ID.
-     *
-     * Steps:
-     *  Step 01 – Recruiter1 creates a job (to obtain a valid jobId)
-     *  Step 02 – Extract jobId from creation response
-     *  Step 03 – Candidate1 submits POST /api/applications
-     *  Step 04 – Assert: HTTP 200, status=PENDING, coverLetter matches, job.id matches
+     * Verifies that a Candidate can successfully apply for an active job. Asserts that
+     * the application is created with status PENDING, the response contains the correct
+     * job ID, cover letter, candidate role, and an appliedAt timestamp.
      */
-    @Test(groups = {"Smoke"}, description = "TC_CR_002 - Candidate Applies for a Job")
-    public void applyForJob() throws Exception {
+    @Test(groups = {"Regression"}, description = "TC_CR_002 - Candidate Applies for a Job")
+    public void candidateAppliesForJob() throws Exception {
 
-        // ── Load per-test static data ─────────────────────────────────────────
         HashMap<String, String> testData = CommonMethod.readTestData(
-                "src/main/resources/testdata/applyForJob.json");
+                "src/main/resources/testdata/candidateAppliesForJob.json");
 
-        // ── STEP 01 — Recruiter1 creates a job ───────────────────────────────
-        log.info("[TC_CR_002] ━━━ STEP 01 ━━━ Recruiter1 creates a job");
+        // ── STEP 01 — Recruiter1 creates a job to obtain a valid jobId ────────
+        log.info("[E2E] ━━━ STEP 01 ━━━ Recruiter1 creates a new job: POST /api/jobs");
         HashMap<String, String> jobData = new HashMap<>();
-        jobData.put("title",       testData.get("job.title"));
-        jobData.put("description", testData.get("job.description"));
-        jobData.put("location",    testData.get("job.location"));
-        jobData.put("company",     testData.get("job.company"));
-        jobData.put("salary",      testData.get("job.salary"));
-        jobData.put("type",        testData.get("job.type"));
-        Response createJobResponse = actorHelperForRecruiter1.createJob(jobData);
-        Assert.assertEquals(createJobResponse.getStatusCode(), 200,
-                "Recruiter1 job creation should return HTTP 200");
+        jobData.put("title",       testData.get("job1.title"));
+        jobData.put("description", testData.get("job1.description"));
+        jobData.put("location",    testData.get("job1.location"));
+        jobData.put("company",     testData.get("job1.company"));
+        jobData.put("salary",      testData.get("job1.salary"));
+        jobData.put("type",        testData.get("job1.type"));
+        Response createJobResp = actorHelperForRecruiter1.createJob(jobData);
+        Assert.assertEquals(createJobResp.getStatusCode(), 200,
+                "Recruiter1 job creation failed — expected HTTP 200");
+        String jobId = createJobResp.jsonPath().getString("data.id");
+        Assert.assertNotNull(jobId, "Job ID must not be null before applying");
+        log.info("[E2E] Created job ID={}", jobId);
 
-        // ── STEP 02 — Extract jobId ───────────────────────────────────────────
-        log.info("[TC_CR_002] ━━━ STEP 02 ━━━ Extract jobId from response");
-        String jobId = createJobResponse.jsonPath().getString("data.id");
-        Assert.assertNotNull(jobId, "Created job ID must not be null");
-        log.info("[TC_CR_002] Job ID extracted: {}", jobId);
-
-        // ── STEP 03 — Candidate1 applies for the job ─────────────────────────
-        log.info("[TC_CR_002] ━━━ STEP 03 ━━━ Candidate1 submits application for job ID {}", jobId);
+        // ── STEP 02 — Candidate1 submits a job application ────────────────────
+        log.info("[E2E] ━━━ STEP 02 ━━━ Candidate1 submits application: POST /api/applications");
         HashMap<String, String> applyData = new HashMap<>();
         applyData.put("jobId",       jobId);
         applyData.put("coverLetter", testData.get("apply.coverLetter"));
-        Response applyResponse = actorHelperForCandidate1.applyForJob(applyData);
+        Response applyResp = actorHelperForCandidate1.applyForJob(applyData);
+        Assert.assertEquals(applyResp.getStatusCode(), 200,
+                "Application submission failed — expected HTTP 200");
 
-        // ── STEP 04 — Assertions ──────────────────────────────────────────────
-        log.info("[TC_CR_002] ━━━ STEP 04 ━━━ Validating application response");
+        // ── STEP 03 — Validate all fields in the application response ─────────
+        log.info("[E2E] ━━━ STEP 03 ━━━ Validate application response fields");
 
-        // Assert HTTP 200
-        Assert.assertEquals(applyResponse.getStatusCode(), 200,
-                "POST /api/applications should return HTTP 200");
+        String applicationId = applyResp.jsonPath().getString("data.id");
+        Assert.assertNotNull(applicationId,
+                "Application ID must not be null in the response");
 
-        // Assert application ID is present
-        String applicationId = applyResponse.jsonPath().getString("data.id");
-        Assert.assertNotNull(applicationId, "Application ID must not be null after submission");
+        Assert.assertEquals(applyResp.jsonPath().getString("data.status"), "PENDING",
+                "Application status must be PENDING immediately after submission");
 
-        // Assert initial status is PENDING
-        String status = applyResponse.jsonPath().getString("data.status");
-        Assert.assertEquals(status, "PENDING",
-                "Newly submitted application status must be 'PENDING'");
+        Assert.assertEquals(applyResp.jsonPath().getString("data.job.id"), jobId,
+                "data.job.id in response must match the job applied to");
 
-        // Assert cover letter matches submitted value
-        String responseCoverLetter = applyResponse.jsonPath().getString("data.coverLetter");
-        Assert.assertEquals(responseCoverLetter, testData.get("apply.coverLetter"),
-                "Cover letter in response must match the submitted cover letter");
+        Assert.assertEquals(applyResp.jsonPath().getString("data.coverLetter"),
+                testData.get("apply.coverLetter"),
+                "Returned cover letter must exactly match the submitted cover letter");
 
-        // Assert job ID in response matches the created job
-        String responseJobId = applyResponse.jsonPath().getString("data.job.id");
-        Assert.assertEquals(responseJobId, jobId,
-                "Job ID in application response must match the created job ID");
+        Assert.assertNotNull(applyResp.jsonPath().getString("data.appliedAt"),
+                "appliedAt timestamp must be present in the application response");
 
-        // Assert job is still active
-        Boolean jobActive = applyResponse.jsonPath().getBoolean("data.job.active");
-        Assert.assertTrue(jobActive, "Job must be active at time of application");
+        Assert.assertTrue(applyResp.jsonPath().getBoolean("data.job.active"),
+                "The applied job must still be active after application submission");
 
-        log.info("[TC_CR_002] ━━━ ALL STEPS COMPLETED SUCCESSFULLY ━━━ [Application ID: {}, Status: {}]",
-                applicationId, status);
+        Assert.assertEquals(applyResp.jsonPath().getString("data.candidate.role"), "CANDIDATE",
+                "Candidate role in response must be CANDIDATE");
+
+        Assert.assertNotNull(applyResp.jsonPath().getString("data.candidate.email"),
+                "Candidate email must be present in application response");
+
+        log.info("[E2E] Application ID={} confirmed — status=PENDING, coverLetter and job.id validated",
+                applicationId);
+
+        log.info("[E2E] ━━━ ALL STEPS COMPLETED SUCCESSFULLY ━━━");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -231,89 +223,102 @@ public class CandidateRoleTests extends BaseTest {
 
     /**
      * TC_CR_003 — Candidate Tracks Application Status
-     * Verifies that Candidate1 can retrieve their own applications after submitting,
-     * and that the tracked application shows the correct status (PENDING),
-     * cover letter, and job reference.
-     *
-     * Steps:
-     *  Step 01 – Recruiter1 creates a new job
-     *  Step 02 – Candidate1 applies for the job; capture applicationId
-     *  Step 03 – Candidate1 calls GET /api/applications/my
-     *  Step 04 – Assert: HTTP 200, list not empty, submitted app found by ID
-     *  Step 05 – Assert: trackedApp.status=PENDING, coverLetter matches
+     * Verifies that a Candidate can retrieve their own applications after submitting one,
+     * and that the tracked application shows the correct status (PENDING), cover letter,
+     * job reference (id, title, company, location), and an appliedAt timestamp.
      */
-    @Test(groups = {"Smoke"}, description = "TC_CR_003 - Candidate Tracks Application Status")
-    public void trackApplicationStatus() throws Exception {
+    @Test(groups = {"Regression"}, description = "TC_CR_003 - Candidate Tracks Application Status")
+    public void candidateTracksApplicationStatus() throws Exception {
 
-        // ── Load per-test static data ─────────────────────────────────────────
         HashMap<String, String> testData = CommonMethod.readTestData(
-                "src/main/resources/testdata/trackApplicationStatus.json");
+                "src/main/resources/testdata/candidateTracksApplicationStatus.json");
 
-        // ── STEP 01 — Recruiter1 creates a job ───────────────────────────────
-        log.info("[TC_CR_003] ━━━ STEP 01 ━━━ Recruiter1 creates a job");
+        // ── STEP 01 — Recruiter1 creates a new job ─────────────────────────────
+        log.info("[E2E] ━━━ STEP 01 ━━━ Recruiter1 creates a new job: POST /api/jobs");
         HashMap<String, String> jobData = new HashMap<>();
-        jobData.put("title",       testData.get("job.title"));
-        jobData.put("description", testData.get("job.description"));
-        jobData.put("location",    testData.get("job.location"));
-        jobData.put("company",     testData.get("job.company"));
-        jobData.put("salary",      testData.get("job.salary"));
-        jobData.put("type",        testData.get("job.type"));
-        Response createJobResponse = actorHelperForRecruiter1.createJob(jobData);
-        Assert.assertEquals(createJobResponse.getStatusCode(), 200,
-                "Recruiter1 job creation should return HTTP 200");
-        String jobId = createJobResponse.jsonPath().getString("data.id");
-        Assert.assertNotNull(jobId, "Created job ID must not be null");
-        log.info("[TC_CR_003] Job ID: {}", jobId);
+        jobData.put("title",       testData.get("job1.title"));
+        jobData.put("description", testData.get("job1.description"));
+        jobData.put("location",    testData.get("job1.location"));
+        jobData.put("company",     testData.get("job1.company"));
+        jobData.put("salary",      testData.get("job1.salary"));
+        jobData.put("type",        testData.get("job1.type"));
+        Response createJobResp = actorHelperForRecruiter1.createJob(jobData);
+        Assert.assertEquals(createJobResp.getStatusCode(), 200,
+                "Recruiter1 job creation failed — expected HTTP 200");
+        String jobId = createJobResp.jsonPath().getString("data.id");
+        Assert.assertNotNull(jobId, "Job ID must not be null");
+        log.info("[E2E] Created job ID={}", jobId);
 
-        // ── STEP 02 — Candidate1 applies for the job ─────────────────────────
-        log.info("[TC_CR_003] ━━━ STEP 02 ━━━ Candidate1 submits application for job ID {}", jobId);
+        // ── STEP 02 — Candidate1 applies for the job ──────────────────────────
+        log.info("[E2E] ━━━ STEP 02 ━━━ Candidate1 applies for the job: POST /api/applications");
         HashMap<String, String> applyData = new HashMap<>();
         applyData.put("jobId",       jobId);
         applyData.put("coverLetter", testData.get("apply.coverLetter"));
-        Response applyResponse = actorHelperForCandidate1.applyForJob(applyData);
-        Assert.assertEquals(applyResponse.getStatusCode(), 200,
-                "POST /api/applications should return HTTP 200");
-        String submittedApplicationId = applyResponse.jsonPath().getString("data.id");
-        Assert.assertNotNull(submittedApplicationId,
-                "Submitted application ID must not be null");
-        log.info("[TC_CR_003] Application submitted — ID: {}", submittedApplicationId);
+        Response applyResp = actorHelperForCandidate1.applyForJob(applyData);
+        Assert.assertEquals(applyResp.getStatusCode(), 200,
+                "Application submission failed — expected HTTP 200");
+        String applicationId = applyResp.jsonPath().getString("data.id");
+        Assert.assertNotNull(applicationId, "Application ID must not be null");
+        log.info("[E2E] Submitted application ID={}", applicationId);
 
-        // ── STEP 03 — Candidate1 retrieves their application list ─────────────
-        log.info("[TC_CR_003] ━━━ STEP 03 ━━━ Candidate1 calls GET /api/applications/my");
-        Response myApplicationsResponse = actorHelperForCandidate1.getMyApplications();
+        // ── STEP 03 — Candidate1 retrieves their application list (dashboard) ──
+        log.info("[E2E] ━━━ STEP 03 ━━━ Candidate1 retrieves application list: GET /api/applications/my");
+        Response myAppsResp = actorHelperForCandidate1.getMyApplications();
+        Assert.assertEquals(myAppsResp.getStatusCode(), 200,
+                "Get my applications failed — expected HTTP 200");
 
-        // ── STEP 04 — Assert HTTP status and list is non-empty ────────────────
-        log.info("[TC_CR_003] ━━━ STEP 04 ━━━ Validating application list response");
+        // ── STEP 04 — Validate the tracked application in the dashboard ───────
+        log.info("[E2E] ━━━ STEP 04 ━━━ Validate tracked application in dashboard");
+        Assert.assertTrue(myAppsResp.jsonPath().getBoolean("success"),
+                "Response 'success' flag must be true");
 
-        Assert.assertEquals(myApplicationsResponse.getStatusCode(), 200,
-                "GET /api/applications/my should return HTTP 200");
+        List<Map<String, Object>> myApps = myAppsResp.jsonPath().getList("data");
+        Assert.assertNotNull(myApps, "Applications list must not be null");
+        Assert.assertTrue(myApps.size() >= 1,
+                "Candidate1 must have at least one application in the dashboard");
 
-        List<ApplicationResponse> applications =
-                actorHelperForCandidate1.getListOfApplications(myApplicationsResponse);
-        Assert.assertFalse(applications.isEmpty(),
-                "Candidate1's application list must not be empty after submitting");
+        // Find the just-submitted application by its ID and validate every tracked field
+        boolean appFound = false;
+        for (Map<String, Object> app : myApps) {
+            if (applicationId.equals(String.valueOf(app.get("id")))) {
 
-        // ── STEP 05 — Find submitted application by ID and assert fields ──────
-        log.info("[TC_CR_003] ━━━ STEP 05 ━━━ Locating submitted application ID {} in list",
-                submittedApplicationId);
-        ApplicationResponse trackedApp = applications.stream()
-                .filter(app -> String.valueOf(app.getId()).equals(submittedApplicationId))
-                .findFirst()
-                .orElse(null);
+                Assert.assertEquals(app.get("status"), "PENDING",
+                        "Tracked application status must be PENDING");
 
-        Assert.assertNotNull(trackedApp,
-                "Submitted application (ID: " + submittedApplicationId + ") must appear in Candidate1's application list");
+                Assert.assertEquals(app.get("coverLetter"), testData.get("apply.coverLetter"),
+                        "Tracked cover letter must match the submitted cover letter");
 
-        // Assert status is PENDING
-        Assert.assertEquals(trackedApp.getStatus(), "PENDING",
-                "Application status must be 'PENDING' immediately after submission");
+                Assert.assertNotNull(app.get("appliedAt"),
+                        "appliedAt timestamp must be present in the dashboard response");
 
-        // Assert cover letter matches originally submitted value
-        Assert.assertEquals(trackedApp.getCoverLetter(), testData.get("apply.coverLetter"),
-                "Cover letter in tracked application must match the originally submitted cover letter");
+                Map<String, Object> trackedJob = (Map<String, Object>) app.get("job");
+                Assert.assertNotNull(trackedJob,
+                        "Tracked application must contain a job reference object");
+                Assert.assertEquals(String.valueOf(trackedJob.get("id")), jobId,
+                        "Tracked job ID must match the job applied to");
+                Assert.assertNotNull(trackedJob.get("title"),
+                        "Job title must be present in the tracked application");
+                Assert.assertNotNull(trackedJob.get("company"),
+                        "Job company must be present in the tracked application");
+                Assert.assertNotNull(trackedJob.get("location"),
+                        "Job location must be present in the tracked application");
 
-        log.info("[TC_CR_003] ━━━ ALL STEPS COMPLETED SUCCESSFULLY ━━━ [App ID: {}, Status: {}]",
-                submittedApplicationId, trackedApp.getStatus());
+                Map<String, Object> candidate = (Map<String, Object>) app.get("candidate");
+                Assert.assertNotNull(candidate,
+                        "Tracked application must contain a candidate reference object");
+                Assert.assertEquals(candidate.get("role"), "CANDIDATE",
+                        "Candidate role in dashboard must be CANDIDATE");
+
+                appFound = true;
+                break;
+            }
+        }
+        Assert.assertTrue(appFound,
+                "Submitted application (ID=" + applicationId + ") must appear in Candidate1 dashboard");
+        log.info("[E2E] Tracked application confirmed — status=PENDING, job ID={}, all fields validated",
+                jobId);
+
+        log.info("[E2E] ━━━ ALL STEPS COMPLETED SUCCESSFULLY ━━━");
     }
 }
 
